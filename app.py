@@ -17,6 +17,11 @@ from transformers import Pix2StructProcessor as ps
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+# Cache model and processor so that they are only loaded once.
+MODEL_NAME = "google/pix2struct-docvqa-large"
+model = None
+processor = None
+
 def generate(model, processor, img, questions):
   inputs = processor(images=[img for _ in range(len(questions))],
            text=questions, return_tensors="pt").to(DEVICE)
@@ -70,20 +75,34 @@ def convert_to_image(input_source, page_no=1):
                          "Expected .pdf or an image format.")
 
 
-def run_doc_vqa(file_path, questions, page_no=1) -> str:
+def load_model(progress=gr.Progress()):
+    """Load the model and processor if they haven't been loaded yet."""
+    global model, processor
+    if model is None or processor is None:
+        progress(0, desc="Loading model...")
+        model = psg.from_pretrained(MODEL_NAME).to(DEVICE)
+        progress(0.5, desc="Loading processor...")
+        processor = ps.from_pretrained(MODEL_NAME)
+        progress(1, desc="Model loaded")
 
-    model = psg.from_pretrained("google/pix2struct-docvqa-large").to(DEVICE)
-    processor = psp.from_pretrained("google/pix2struct-docvqa-large")
 
+def run_doc_vqa(file_path, questions, page_no=1, progress=gr.Progress()) -> str:
+    """Run document VQA and return answers."""
+    load_model(progress)
+
+    progress(0.6, desc="Preparing image...")
     image = convert_to_image(file_path, page_no)
-    # print("pdf to image conversion complete.")
+
+    progress(0.8, desc="Running inference...")
     generator = partial(generate, model, processor)
     completions = generator(image, questions)
+
+    progress(1, desc="Done")
     return [i for i in completions]
 
 
 
-def collect_inputs(file_obj, texts, log_history):
+def collect_inputs(file_obj, texts, log_history, progress=gr.Progress()):
     """
     Process the uploaded file and questions.
     """
@@ -109,7 +128,7 @@ def collect_inputs(file_obj, texts, log_history):
     # log_entry = f"[{timestamp}] Questions asked:\n" + "\n".join(f"- {q}" for q in questions) + "\n\n"
     # new_log = log_entry + log_history
 
-    results = run_doc_vqa(file_path, questions, page_no=1)
+    results = run_doc_vqa(file_path, questions, page_no=1, progress=progress)
     return results
     # return "\n".join(f"{q}: {a}" for q, a in results)
 
