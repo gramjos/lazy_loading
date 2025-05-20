@@ -34,21 +34,7 @@ from pathlib import Path
 from io import BytesIO
 
 def convert_to_image(input_source, page_no=1):
-    """
-    Load a page from a PDF or an image file and return it as a PIL.Image.
 
-    Args:
-        input_source (str | bytes | Path):
-            - If a str or Path ending in .pdf, treated as a PDF file path.
-            - If bytes or a path to an image (.jpg, .png, etc.), treated as an image.
-        page_no (int): 1-based page number for PDF (ignored for images).
-
-    Returns:
-        PIL.Image.Image: the requested page/image.
-
-    Raises:
-        ValueError: if the file type is unsupported or page_no > 1 on image input.
-    """
     # If raw bytes, try opening as image first
     if isinstance(input_source, (bytes, bytearray)):
         return Image.open(BytesIO(input_source))
@@ -164,5 +150,5 @@ with gr.Blocks() as demo:
         inputs=[file_input, questions],
         outputs=[output,]
     )
-
+demo.queue()
 demo.launch()
